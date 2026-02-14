@@ -11,6 +11,7 @@
 #include <cilk/opadd_reducer.h>
 #include <cilk/cilk.h>
 #include <cilk/cilk_api.h>
+#include <cilk/opadd_reducer.h>
 
 #define MERGESIZE (2048)
 
@@ -18,15 +19,15 @@ const int64_t INIT_CHUNK = 100000;
 
 /* Validate returns a count of the number of times the i-th number is less than (i-1)th number.
    This version is parallel using cilk_for and cilk reducer. */
-int64_t ValidateParallel(const std::vector<int64_t> & input) {
+int64_t ValidateParallel(const std::vector<int64_t> & input){
 
     int64_t n = input.size();
-    if (n <= 1) return 0;
+    if(n <= 1) return 0;
     
-    cilk::opadd_reducer<int64_t> count(0);
+    cilk::opadd_reducer<std::vector<int>> count(0);
 
-    cilk_for (uint64_t i = 1; i < n; i++) {
-        if (input[i-1] > input[i]) {
+    cilk_for(uint64_t i = 1; i < n; i++){
+        if(input[i-1] > input[i]){
             count += 1;
         }
     }
@@ -37,22 +38,22 @@ int64_t ValidateParallel(const std::vector<int64_t> & input) {
 
 void SerialMerge(const std::vector<int64_t> & vec,  int64_t Astart,  int64_t Aend, int64_t Bstart,
                  int64_t Bend, std::vector<int64_t> & tmp, int64_t tmpIdx){
-    if (Astart <= Aend && Bstart <= Bend) {
-        while(true) {
-            if (vec[Astart] < vec[Bstart]) {
+    if(Astart <= Aend && Bstart <= Bend){
+        while(true){
+            if(vec[Astart] < vec[Bstart]){
                 tmp[tmpIdx++] = vec[Astart++];
-                if (Astart > Aend) break;
-            } else {
+                if(Astart > Aend) break;
+            } else{
                 tmp[tmpIdx++] = vec[Bstart++];
-                if (Bstart > Bend) break;
+                if(Bstart > Bend) break;
             }
         }
     }
-    if (Astart > Aend) {
-        if (Bstart <= Bend)
+    if(Astart > Aend){
+        if(Bstart <= Bend)
             memcpy(&tmp[tmpIdx], &vec[Bstart], sizeof(int64_t) * (Bend - Bstart + 1));
-    } else {
-        if (Astart <= Aend)
+    } else{
+        if(Astart <= Aend)
             memcpy(&tmp[tmpIdx], &vec[Astart], sizeof(int64_t) * (Aend - Astart + 1));
     }
 }
@@ -61,15 +62,15 @@ void SerialMerge(const std::vector<int64_t> & vec,  int64_t Astart,  int64_t Aen
 //  makes Halfway split the mid element in its correct position and spawns 2 More 'll merges 
 
 void ParallelMerge(const std::vector<int64_t> & vec, int64_t Astart, int64_t Aend, int64_t Bstart,
-                 int64_t Bend, std::vector<int64_t> & tmp, int64_t tmpIdx) {
+                 int64_t Bend, std::vector<int64_t> & tmp, int64_t tmpIdx){
 
     // Base Cases
-    if (Astart > Aend) {
+    if(Astart > Aend){
         if (Bstart <= Bend)
             memcpy(&tmp[tmpIdx], &vec[Bstart], sizeof(int64_t) * (Bend - Bstart + 1));
         return;
     }
-    if (Bstart > Bend) {
+    if(Bstart > Bend){
         if (Astart <= Aend)
             memcpy(&tmp[tmpIdx], &vec[Astart], sizeof(int64_t) * (Aend - Astart + 1));
         return;
@@ -79,13 +80,13 @@ void ParallelMerge(const std::vector<int64_t> & vec, int64_t Astart, int64_t Aen
     int64_t n2 = Bend - Bstart + 1;
 
     // small case , jst merge serially
-    if ((n1 + n2) <= MERGESIZE) {
+    if((n1 + n2) <= MERGESIZE){
         SerialMerge(vec, Astart, Aend, Bstart, Bend, tmp, tmpIdx);
         return;
     }
 
     // pick the mid ele from the larger of the two arrays to balance recursion.
-    if (n1 >= n2) {
+    if(n1 >= n2){
 
         int64_t midA = Astart + (n1 / 2);
         int64_t val = vec[midA];    // find mid value
@@ -110,7 +111,7 @@ void ParallelMerge(const std::vector<int64_t> & vec, int64_t Astart, int64_t Aen
         ParallelMerge(vec, midA + 1, Aend, Bk, Bend, tmp, pos + 1);
         cilk_sync;
 
-    } else { // th mirror case 
+    } else{ // th mirror case 
 
         // n2 > n1: pick median from B (for balenced resursion)
         int64_t midB = Bstart + (n2 / 2);
@@ -132,7 +133,7 @@ void MergeSortSerial(std::vector<int64_t> & vec, int64_t start, std::vector<int6
                     int64_t tmpStart, int64_t sz, int64_t depth, int64_t limit){
     
     // Note: also need to use depth and limit to control the granularity in the parallel case.
-    if (sz < MERGESIZE) {
+    if(sz < MERGESIZE){
         sort(vec.begin() + start,vec.begin() + start + sz);
         return;
     }
@@ -157,12 +158,12 @@ void MergeSortSerial(std::vector<int64_t> & vec, int64_t start, std::vector<int6
 
 // MergeSort sorts vec[start..start+sz-1] using tmp[] as a temporary array. if depth >= limit then switch to serial.
 void MergeSortParallel(std::vector<int64_t> & vec, int64_t start, std::vector<int64_t> & tmp, 
-                        int64_t tmpStart, int64_t sz, int64_t depth, int64_t limit) {
+                        int64_t tmpStart, int64_t sz, int64_t depth, int64_t limit){
 
-    if (sz <= 1) return;
+    if(sz <= 1) return;
 
     // If reached cutoff for parallelism, or the piece is small, do serial.
-    if (depth >= limit || sz <= MERGESIZE) {
+    if(depth >= limit || sz <= MERGESIZE){
         MergeSortSerial(vec, start, tmp, tmpStart, sz, depth, limit);
         return;
     }
@@ -187,18 +188,18 @@ void MergeSortParallel(std::vector<int64_t> & vec, int64_t start, std::vector<in
 }
 
 // Initialize vec[start..end) with random numbers in parallel chunks.
-void InitParallel(std::vector<int64_t> & vec) {
+void InitParallel(std::vector<int64_t> & vec){
     const int64_t n = vec.size();
     const int64_t nchunks = (n + INIT_CHUNK - 1) / INIT_CHUNK;
 
-    cilk_for (int64_t c = 0; c < nchunks; ++c) {
+    cilk_for(int64_t c = 0; c < nchunks; ++c){
         int64_t start = c * INIT_CHUNK;
         int64_t end   = std::min(n, start + INIT_CHUNK);
 
         struct drand48_data buffer;
         srand48_r(static_cast<unsigned>(time(NULL) ^ (start << 6)), &buffer);
 
-        for (int64_t i = start; i < end; ++i) {
+        for (int64_t i = start; i < end; ++i){
             long int v;
             lrand48_r(&buffer, &v);
             vec[i] = v;
@@ -207,16 +208,16 @@ void InitParallel(std::vector<int64_t> & vec) {
 }
 
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]){
 
-    if (argc != 3) {
+    if(argc != 3){
         std:: cout << "Usage " << argv[0] << " <vector size> <cutoff>\n";
         std:: cout << " cutoff is 0-based recursion depth at which parallelism stops (0 => serial)\n";
         return -1;
     }
 
     int64_t sz = atol(argv[1]);
-    if (sz <= 0) {
+    if(sz <= 0){
         std::cerr << "enter valid vector size (> 0) !" << std::endl;
         return -1;
     }
