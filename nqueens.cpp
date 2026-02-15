@@ -12,21 +12,19 @@
 #include <cilk/opadd_reducer.h>
 
 
-/* each worker has a private solution_store;
-the merge function used appends the solution_stores once cilk_sync is reached. */
-
+// reducer to store all solutions,
 struct solution_store {
     std::vector<std::vector<int>> sols;
     solution_store() = default;
 };
 
 // identity to initialize a reducer in-place 
-void identity(void *view){
+void identity_all_sol(void *view){
     new (view) solution_store();
 }
 
 // merge: append right.sols into left.sols 
-void merge(void *left, void *right){
+void merge_all_sol(void *left, void *right){
 
     solution_store* L = reinterpret_cast<solution_store*>(left);
     solution_store* R = reinterpret_cast<solution_store*>(right);
@@ -35,8 +33,30 @@ void merge(void *left, void *right){
     L->sols.insert(L->sols.end(), R->sols.begin(), R->sols.end());
 }
 
-// reducer variable
-solution_store cilk_reducer(identity, merge) all_solutions;
+// reducer to store unique solutions
+struct unique_store{
+    std::set<std::vector<int>> uniq;
+    unique_store() = default;
+};
+
+void identity_uniq_sol(void* view){
+    new (view) unique_store();
+}
+
+void merge_uniq_sol(void* left,void* right){
+    unique_store* L = reinterpret_cast<unique_store*>(left);
+    unique_store* R = reinterpret_cast<unique_store*>(right);
+
+    // deterministically merge left and right sols
+    L->uniq.insert(R->uniq.begin(), R->uniq.end()); 
+}
+
+
+// reducer variable to store all solutions
+solution_store cilk_reducer(identity_all_sol, merge_all_sol) all_solutions;
+
+// reducer variable to store uniq solutions
+unique_store cilk_reducer(identity_uniq_sol,merge_uniq_sol) uniq_solutions;
 
 // Atomic counter to support 'stopafter' 
 std::atomic<long long> found_count(0);
@@ -143,6 +163,10 @@ void solve(int N, int row,
         if (try_to_record(stopafter)){
             // this is safe each worker has his private reducer view
             all_solutions.sols.push_back(board);
+
+            // also add uniq sol to unique_store reducer
+            std::vector<int> canon = canonical(board);
+            uniq_solutions.uniq.insert(canon);
         }
         return;
     }
@@ -205,33 +229,24 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int>> allsols = all_solutions.sols;
 
     // Print All solutions
-    std::cout << "All solutions:\n";
+    std::cout << "All solutions:" << std::endl;
     for (size_t i = 0; i < allsols.size(); ++i) {
         std::cout << "solution " << i << ":";
         for (int x : allsols[i]) 
             std::cout << " " << x;
-        std::cout << "\n";
+        std::cout << std::endl;
     }
 
-    // Compute unique solutions using canonical representative
-    std::cout << "Unique solutions:\n";
-    std::set<std::vector<int>> seen;
-    std::vector<std::vector<int>> uniques;
-    for (const auto &s : allsols) {
-        std::vector<int> c = canonical(s);
-        if (seen.insert(c).second) {
-            uniques.push_back(s);
-        }
-    }
-    for (size_t i = 0; i < uniques.size(); ++i) {
-        std::cout << "unique solution " << i << ":";
-        for (int x : uniques[i]) 
+    int idx = 0;
+    for(const auto& sol : uniq_solutions.uniq){
+        std::cout << "unique solution " << idx++ << ":";
+        for(int x : sol)
             std::cout << " " << x;
-        std::cout << "\n";
+        std::cout << std::endl;
     }
 
     std::cout << "Number of solutions: " << allsols.size() << "\n";
-    std::cout << "Number of unique solutions: " << uniques.size() << "\n";
+    std::cout << "Number of unique solutions: " << uniq_solutions.uniq.size() << "\n";
     std::cout<<"\nruntime = "<<std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()<<" ms\n";
 
     
