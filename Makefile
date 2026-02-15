@@ -40,19 +40,19 @@ sortSerial: $(SRC_1)
 
 # as cutoff = 0 implies serial exicution 
 runSortSerial: sortSerial
-	./$< $(SIZE) 0 
+	./$(OUT)/$< $(SIZE) 0 
 
 sortCilk: $(SRC_1)
 	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $< -o $(OUT)/$@ 
 
 runSortCilk: sortCilk
-	CILK_NWORKERS=$(CILK_NWORKERS) ./$< $(SIZE) $(CUTOFF)
+	CILK_NWORKERS=$(CILK_NWORKERS) ./$(OUT)/$< $(SIZE) $(CUTOFF)
 
 sortSan: $(SRC_1)
 	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $(DR_FLAGS) $^ -o $(OUT)/$@
 
 runSortSan: sortSan
-	CILK_NWORKERS=1 ./$< $(SIZE) $(CUTOFF)
+	CILK_NWORKERS=1 ./$(OUT)/$< $(SIZE) $(CUTOFF)
 
 sortBenchmark: $(SRC_1)
 	$(CXX) $(CXXFLAGS) $(BM_FLAGS) $(CILK_FLAGS) $^ -o $(OUT)/$@
@@ -68,19 +68,19 @@ queenSerial: $(SRC_2)
 
 #setting cutoff = 0 runs the NQueens code serially.
 runQueenSerial:	queenSerial
-	./$< $(N) 0 $(REPORTAFTER)
+	./$(OUT)/$< $(N) 0 $(REPORTAFTER)
 
 queenCilk: $(SRC_2)
 	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $< -o $(OUT)/$@
 
 runQueenCilk: queenCilk
-	CILK_NWORKERS=$(CILK_NWORKERS) ./$< $(N) $(CUTOFF) $(REPORTAFTER)
+	CILK_NWORKERS=$(CILK_NWORKERS) ./$(OUT)/$< $(N) $(CUTOFF) $(REPORTAFTER)
 
 queenSan: $(SRC_2)
 	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $(DR_FLAGS) $^ -o $(OUT)/$@
 
 runQueenSan: queenSan
-	CILK_NWORKERS=1 ./$< $(N) $(CUTOFF) $(REPORTAFTER)
+	CILK_NWORKERS=1 ./$(OUT)/$< $(N) $(CUTOFF) $(REPORTAFTER)
 
 queenBenchmark: $(SRC_2)
 	$(CXX) $(CXXFLAGS) $(BM_FLAGS) $(CILK_FLAGS) $^ -o $(OUT)/$@
