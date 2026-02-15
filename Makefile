@@ -17,9 +17,25 @@ OUT=bin
 SRC_1=src/MergeSort.cpp
 EXECUTABLE_1 =  sortSerial sortCilk sortSan sortBenchmark sortScale
 
-all: $(EXECUTABLE)
+SRC_2=src/NQueens.cpp
+EXECUTABLE_2 =  queenSerial queenCilk queenSan queenScale queenBenchmark
+
+all: $(EXECUTABLE_1) $(EXECUTABLE_2)
+	@echo "==========================================="
+	@echo "Targets             : Variables Used"
+	@echo "-------------------------------------------"
+	@echo "runSortSerial       : SIZE"
+	@echo "runSortCilk         : SIZE CUTOFF CILK_NWORKERS"
+	@echo "runSortSan          : SIZE CUTOFF"
+	@echo "runSortScale        : SIZE CUTOFF"
+	@echo "runQueenSerial      : N REPORTAFTER"
+	@echo "runQueenCilk        : N CUTOFF REPORTAFTER CILK_NWORKERS"
+	@echo "runQueenSan         : N CUTOFF REPORTAFTER"
+	@echo "==========================================="
 
 sortSerial: $(SRC_1)
+	@echo "strating build..."
+	@echo 
 	$(CXX) $(CXXFLAGS) $< -o $(OUT)/$@
 
 # as cutoff = 0 implies serial exicution 
@@ -46,9 +62,6 @@ sortScale: $(SRC_1)
 
 runSortScale: sortScale sortBenchmark
 	python3 /home/apps/opencilk/cilktools/Cilkscale_vis/cilkscale.py -c ./sortScale -b ./sortBenchmark -cpus 1,2,3,4,8,16,32  --output-csv report.csv --output-plot report.pdf -a $(SIZE) $(CUTOFF)
-
-SRC_2=src/NQueens.cpp
-EXECUTABLE_2 =  queenSerial queenCilk queenSan queenScale queenBenchmark
 
 queenSerial: $(SRC_2)
 	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $< -o $(OUT)/$@
