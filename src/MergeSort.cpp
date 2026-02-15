@@ -8,12 +8,24 @@
 #include <assert.h>
 #include <cstring>
 #include <chrono>
-#include <cilk/opadd_reducer.h>
+
+#ifdef CILK
+
 #include <cilk/cilk.h>
 #include <cilk/cilk_api.h>
 #include <cilk/opadd_reducer.h>
 
-#define MERGESIZE (2048)
+
+#else
+
+#define cilk_spawn
+#define cilk_sync
+#define cilk_for for
+
+#endif
+
+
+#define MERGESIZE (2048) // TODO tune this 
 
 const int64_t INIT_CHUNK = 100000;
 
@@ -24,7 +36,11 @@ int64_t ValidateParallel(const std::vector<int64_t> & input){
     int64_t n = input.size();
     if(n <= 1) return 0;
     
-    cilk::opadd_reducer<std::vector<int>> count(0);
+    #ifdef CILK
+        cilk::opadd_reducer<int64_t> count(0);
+    #else
+        int64_t count;
+    #endif
 
     cilk_for(uint64_t i = 1; i < n; i++){
         if(input[i-1] > input[i]){
@@ -42,10 +58,12 @@ void SerialMerge(const std::vector<int64_t> & vec,  int64_t Astart,  int64_t Aen
         while(true){
             if(vec[Astart] < vec[Bstart]){
                 tmp[tmpIdx++] = vec[Astart++];
-                if(Astart > Aend) break;
+                if(Astart > Aend) 
+                    break;
             } else{
                 tmp[tmpIdx++] = vec[Bstart++];
-                if(Bstart > Bend) break;
+                if(Bstart > Bend) 
+                    break;
             }
         }
     }
@@ -227,7 +245,7 @@ int main(int argc, char* argv[]){
     std::vector<int64_t> input(sz);
     std::vector<int64_t> tmp(sz);
 
-    // Parallel initialization in chunks to allow drand48_r per-chunk.
+    // Parallel initialization in chunks to allow lrand48_r per-chunk.
     InitParallel(input);
 
 
@@ -235,10 +253,10 @@ int main(int argc, char* argv[]){
     MergeSortParallel(input, 0, tmp, 0, sz, /*depth=*/0 , /*limit=*/cutoff);
     auto end = std::chrono::system_clock::now();
 
-    std::cout<<"\nruntime = "<<std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()<<" ms\n";
+    std::cout<<"\nruntime = "<<std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()<<" ms" << std::endl;
 
     auto mistakes = ValidateParallel(input);
-    std::cout << "Mistakes=" << mistakes << "\n";
+    std::cout << "Mistakes=" << mistakes << std::endl;
 
     assert ( (mistakes == 0)  && " Validate() failed");
 

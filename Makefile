@@ -1,10 +1,10 @@
-CXX=/home/apps/opencilk/build/bin/clang++
+CXX=clang++
 
 DEBUG ?= 0
 ifeq ($(DEBUG), 1)
-	CXXFLAGS=-O0 -g -std=c++11 
+	CXXFLAGS=-O0 -g 
 else
-	CXXFLAGS=-O3 -g -std=c++11
+	CXXFLAGS=-O3
 endif
 
 CILK_FLAGS=-fopencilk -DCILK
@@ -12,38 +12,71 @@ DR_FLAGS=-fsanitize=cilk
 BM_FLAGS=-fcilktool=cilkscale-benchmark
 SCALE_FLAGS=-fcilktool=cilkscale
 
-EXECUTABLE =  sortSerial sortCilk sortSan sortBenchmark sortScale
-#SRC=sort.serial.cpp
-SRC=sort.parallel2.cpp 
+OUT=bin
+
+SRC_1=src/MergeSort.cpp
+EXECUTABLE_1 =  sortSerial sortCilk sortSan sortBenchmark sortScale
+
 all: $(EXECUTABLE)
 
-sortSerial: $(SRC)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+sortSerial: $(SRC_1)
+	$(CXX) $(CXXFLAGS) $< -o $(OUT)/$@
 
+# as cutoff = 0 implies serial exicution 
 runSortSerial: sortSerial
-	./$< $(SIZE) $(CUTOFF)
+	./$< $(SIZE) 0 
 
-sortCilk: $(SRC)
-	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) -o $@ $^
+sortCilk: $(SRC_1)
+	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $< -o $(OUT)/$@ 
 
 runSortCilk: sortCilk
 	CILK_NWORKERS=$(CILK_NWORKERS) ./$< $(SIZE) $(CUTOFF)
 
-sortSan: $(SRC)
-	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $(DR_FLAGS) -o $@ $^
+sortSan: $(SRC_1)
+	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $(DR_FLAGS) $^ -o $(OUT)/$@
 
 runSortSan: sortSan
 	CILK_NWORKERS=1 ./$< $(SIZE) $(CUTOFF)
 
-sortBenchmark: $(SRC)
-	$(CXX) $(CXXFLAGS) $(BM_FLAGS) $(CILK_FLAGS) -o $@ $^
+sortBenchmark: $(SRC_1)
+	$(CXX) $(CXXFLAGS) $(BM_FLAGS) $(CILK_FLAGS) $^ -o $(OUT)/$@
 
-sortScale: $(SRC)
-	$(CXX) $(CXXFLAGS) $(SCALE_FLAGS) $(CILK_FLAGS) -o $@ $^
+sortScale: $(SRC_1)
+	$(CXX) $(CXXFLAGS) $(SCALE_FLAGS) $(CILK_FLAGS) $^ -o $(OUT)/$@
 
 runSortScale: sortScale sortBenchmark
 	python3 /home/apps/opencilk/cilktools/Cilkscale_vis/cilkscale.py -c ./sortScale -b ./sortBenchmark -cpus 1,2,3,4,8,16,32  --output-csv report.csv --output-plot report.pdf -a $(SIZE) $(CUTOFF)
 
+SRC_2=src/NQueens.cpp
+EXECUTABLE_2 =  queenSerial queenCilk queenSan queenScale queenBenchmark
 
+queenSerial: $(SRC_2)
+	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $< -o $(OUT)/$@
+
+#setting cutoff = 0 runs the NQueens code serially.
+runQueenSerial:	queenSerial
+	./$< $(N) 0 $(REPORTAFTER)
+
+queenCilk: $(SRC_2)
+	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $< -o $(OUT)/$@
+
+runQueenCilk: queenCilk
+	CILK_NWORKERS=$(CILK_NWORKERS) ./$< $(N) $(CUTOFF) $(REPORTAFTER)
+
+queenSan: $(SRC_2)
+	$(CXX) $(CXXFLAGS) $(CILK_FLAGS) $(DR_FLAGS) $^ -o $(OUT)/$@
+
+runQueenSan: queenSan
+	CILK_NWORKERS=1 ./$< $(N) $(CUTOFF) $(REPORTAFTER)
+
+queenBenchmark: $(SRC_2)
+	$(CXX) $(CXXFLAGS) $(BM_FLAGS) $(CILK_FLAGS) $^ -o $(OUT)/$@
+
+queenScale: $(SRC_2)
+	$(CXX) $(CXXFLAGS) $(SCALE_FLAGS) $(CILK_FLAGS) $^ -o $(OUT)/$@
+
+#TODO
+runQueenScale: queenScale queenBenchmark
+	
 clean:
-	rm -f *.o *~ core $(EXECUTABLE)
+	rm -f bin/* && touch bin/.gitkeep

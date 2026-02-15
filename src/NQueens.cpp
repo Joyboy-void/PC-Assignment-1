@@ -7,9 +7,21 @@
 #include <cstdlib>
 #include <chrono>
 
+#ifdef CILK
+
 #include <cilk/cilk.h>
-#include <cilk/cilk_api.h> 
+#include <cilk/cilk_api.h>
 #include <cilk/opadd_reducer.h>
+
+#else
+
+#define cilk_spawn
+#define cilk_sync
+#define cilk_for for
+
+#endif
+
+
 
 
 // reducer to store all solutions,
@@ -51,12 +63,17 @@ void merge_uniq_sol(void* left,void* right){
     L->uniq.insert(R->uniq.begin(), R->uniq.end()); 
 }
 
-
+#ifdef CILK
 // reducer variable to store all solutions
 solution_store cilk_reducer(identity_all_sol, merge_all_sol) all_solutions;
 
 // reducer variable to store uniq solutions
 unique_store cilk_reducer(identity_uniq_sol,merge_uniq_sol) uniq_solutions;
+
+#else
+    solution_store all_solutions;
+    unique_store uniq_solutions;
+#endif
 
 // Atomic counter to support 'stopafter' 
 std::atomic<long long> found_count(0);
@@ -149,7 +166,7 @@ int count_trailing_zeros(uint64_t bit) {
    n-queens recursion using bitmasks.
    board is passed by value so each child gets its own copy.
 */
-void solve(int N, int row,
+void solve_nqueens(int N, int row,
            uint64_t cols, uint64_t d1, uint64_t d2, /*bitmasks for columns,main diagonals,anti diagonals*/
            std::vector<int> board, int cutoff, long long stopafter){
 
@@ -191,10 +208,10 @@ void solve(int N, int row,
 
         // spawn if allowed by cutoff
         if (cutoff == -1 || row < cutoff) {
-            cilk_spawn solve(N, row + 1, cols | bit, (d1 | bit) << 1, (d2 | bit) >> 1, board, cutoff, stopafter);
+            cilk_spawn solve_nqueens(N, row + 1, cols | bit, (d1 | bit) << 1, (d2 | bit) >> 1, board, cutoff, stopafter);
         } else {
             // serial
-            solve(N, row + 1, cols | bit, (d1 | bit) << 1, (d2 | bit) >> 1, board, cutoff, stopafter);
+            solve_nqueens(N, row + 1, cols | bit, (d1 | bit) << 1, (d2 | bit) >> 1, board, cutoff, stopafter);
         }
     }
     cilk_sync;
@@ -222,7 +239,7 @@ int main(int argc, char* argv[]) {
 
     // start 
     auto start = std::chrono::system_clock::now();
-    solve(N, 0, 0ULL, 0ULL, 0ULL, board, cutoff, stopafter);
+    solve_nqueens(N, 0, 0ULL, 0ULL, 0ULL, board, cutoff, stopafter);
     auto end = std::chrono::system_clock::now();
 
     // At this point, reduction has happened and all_solutions.sols contains all collected solutions
